@@ -4,7 +4,7 @@ import streamlit as st
 # 0. 必須為 Streamlit 第一行指令：強制全螢幕寬版配置 (解決版面集中問題)
 # ==========================================
 st.set_page_config(
-    page_title="德基水庫庫容推估與發電聯調模擬系統",
+    page_title="德基水庫庫容推估系統",
     page_icon="🔌",
     layout="wide"
 )
