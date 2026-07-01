@@ -379,13 +379,17 @@ with tab_config:
     # 生成總時間剖面與防呆狀態顯示
     if st.session_state.display_start_date < st.session_state.end_date and st.session_state.start_date < st.session_state.end_date:
         df_cal = generate_date_profile(st.session_state.display_start_date, st.session_state.end_date)
-        st.success(
-            f"📅 曆法與時間剖面配置成功：\n"
-            f"* 當前展示+推估總計算天數：<b>{len(df_cal)}</b> 天\n"
-            f"* 歷史展示區間：{st.session_state.display_start_date} 至 {st.session_state.start_date - datetime.timedelta(days=1)}\n"
-            f"* 物理守恆推估區間：{st.session_state.start_date} 至 {st.session_state.end_date - datetime.timedelta(days=1)}"
-        )
+        
+        # 預先計算後續頁籤會用到的全區間唯一旬度 (與鯉魚潭保持一致)
+        unique_periods = df_cal.groupby(["年份", "月份", "旬別"]).size().reset_index().drop(columns=[0])
+        period_order = {"上旬": 1, "中旬": 2, "下旬": 3}
+        unique_periods["旬別順序碼"] = unique_periods["旬別"].map(period_order)
+        unique_periods = unique_periods.sort_values(by=["年份", "月份", "旬別順序碼"]).drop(columns=["旬別順序碼"]).reset_index(drop=True)
+        
+        # 修正為與鯉魚潭完全一致的單行 Markdown 加粗成功字卡
+        st.success(f"📅 曆法配置成功：當前展示+推估計算區間（left-closed right-open，即左閉右開）共計 **{len(df_cal)}** 天。")
     else:
+        unique_periods = pd.DataFrame()
         st.error("❌ 日期區間衝突，請先修正上方日期。")
 
 # -----------------
