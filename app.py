@@ -624,8 +624,8 @@ if "scenarios" not in st.session_state:
 # ==========================================
 # 6. 前端 UI 分頁排版
 # ==========================================
-st.title("🔌 德基水庫庫容推估與發電聯調模擬系統")
-st.markdown("大甲溪複式串聯發電聯調與下游控制模擬")
+st.title("🔌 德基水庫庫容推估系統")
+st.markdown("大甲溪系列電廠與石岡壩聯合操作模擬")
 
 tab_config, tab_inflow, tab_outflow, tab_simulation, tab_products = st.tabs([
     "⚙️ 第一階段：推估需求基礎資料設定", 
