@@ -643,7 +643,7 @@ with tab_config:
     col1, col2 = st.columns(2)
     
     with col1:
-        st.markdown("##### 🏛️ 德基水庫水位與聯調參數設定")
+        st.markdown("##### 🏛️ 德基水庫水位與側流參數設定")
         
         elev_input = st.number_input(
             "德基水庫人為控制水位高程 (EL 公尺)", 
@@ -669,10 +669,10 @@ with tab_config:
             max_value=100.0,
             value=st.session_state.lateral_flow_b,
             step=0.5,
-            help="此側流在模擬中會優先扣減最下游石岡壩之總需求。預設為 0.0 萬噸/日。"
+            help="此側流在模擬中會優先折抵最下游石岡壩之總需求，減少馬鞍壩放水量。預設為 0.0 萬噸/日。"
         )
 
-        with st.expander("🍂 德基至馬鞍壩間側流係數設定 (側流A, 月份動態)", expanded=False):
+        with st.expander("🍂 德基至馬鞍壩間側流係數設定 (側流A, 各月份可依需求調整)", expanded=False):
             st.caption("側流 A 推估公式：今日側流 A = 當日德基入流量 * 當月側流係數。請於下方微調各月份預設值：")
             m_cols1 = st.columns(6)
             m_cols2 = st.columns(6)
@@ -1398,9 +1398,9 @@ with tab_outflow:
 # TAB 4: 第四階段：核心庫容守恆演算
 # -----------------
 with tab_simulation:
-    st.subheader("🧮 德基水庫與大甲溪聯調庫容推估結果")
+    st.subheader("🧮 德基水庫庫容推估結果")
     st.markdown("""
-    本模組依據 **「德基水位限制、無溢流強制放水、側流A抵扣馬鞍放水、側流B優先抵扣石岡總需求」** 之原則，逐日進行質量守恆物理演算。
+    本模組依據 **「德基水位人為操作限制、無溢流強制放水、側流A折減馬鞍放水、側流B優先折減石岡總需求」** 之調度原則，進行逐日水庫庫容演算。
     """)
     
     if proj_unique_periods.empty:
@@ -1410,7 +1410,7 @@ with tab_simulation:
     else:
         btn_cols = st.columns([1, 3])
         with btn_cols[0]:
-            trigger_sim = st.button("▶️ 開始進行發電聯調推估", type="primary")
+            trigger_sim = st.button("▶️ 開始進行庫容推估", type="primary")
             
         if trigger_sim:
             control_elevation = st.session_state.control_elevation
