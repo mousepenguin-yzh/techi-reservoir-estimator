@@ -664,34 +664,34 @@ with tab_config:
         )
         
     with st.expander("🍂 德基至馬鞍壩間側流係數設定 (側流A, 各月份可依需求調整)", expanded=False):
-        st.caption("側流 A 推估公式：今日側流 A = 當日德基入流量 * 當月側流係數。請於下方微調各月份預設值：")
-        m_cols1 = st.columns(6)
-        m_cols2 = st.columns(6)
-        
-        for m in range(1, 7):
-            with m_cols1[m-1]:
-                st.session_state.monthly_lateral_coeffs[m] = st.number_input(
-                    f"{m}月", min_value=0.0, max_value=10.0,
-                    value=st.session_state.monthly_lateral_coeffs[m],
-                    step=0.1, key=f"lat_m_{m}"
-                )
-                
-        for m in range(7, 13):
-            with m_cols2[m-7]:
-                st.session_state.monthly_lateral_coeffs[m] = st.number_input(
-                    f"{m}月", min_value=0.0, max_value=10.0,
-                    value=st.session_state.monthly_lateral_coeffs[m],
-                    step=0.1, key=f"lat_m_{m}"
-                )
+            st.caption("側流 A 推估公式：今日側流 A = 當日德基入流量 * 當月側流係數。請於下方微調各月份預設值：")
+            m_cols1 = st.columns(6)
+            m_cols2 = st.columns(6)
+            
+            for m in range(1, 7):
+                with m_cols1[m-1]:
+                    st.session_state.monthly_lateral_coeffs[m] = st.number_input(
+                        f"{m}月", min_value=0.0, max_value=10.0,
+                        value=st.session_state.monthly_lateral_coeffs[m],
+                        step=0.1, key=f"lat_m_{m}"
+                    )
+                    
+            for m in range(7, 13):
+                with m_cols2[m-7]:
+                    st.session_state.monthly_lateral_coeffs[m] = st.number_input(
+                        f"{m}月", min_value=0.0, max_value=10.0,
+                        value=st.session_state.monthly_lateral_coeffs[m],
+                        step=0.1, key=f"lat_m_{m}"
+                    )
 
-    st.session_state.lateral_flow_b = st.number_input(
-        "馬鞍壩至石岡壩間日側流量 (側流B, 萬噸/日)",
-        min_value=0.0,
-        max_value=100.0,
-        value=st.session_state.lateral_flow_b,
-        step=0.5,
-        help="此側流在模擬中會優先折抵最下游石岡壩之總需求，減少馬鞍壩放水量。預設為 0.0 萬噸/日。"
-    )
+        st.session_state.lateral_flow_b = st.number_input(
+            "馬鞍壩至石岡壩間日側流量 (側流B, 萬噸/日)",
+            min_value=0.0,
+            max_value=100.0,
+            value=st.session_state.lateral_flow_b,
+            step=0.5,
+            help="此側流在模擬中會優先折抵最下游石岡壩之總需求，減少馬鞍壩放水量。預設為 0.0 萬噸/日。"
+        )
             
     with col2:
         st.markdown("##### 📅 曆法與時序區間設定")
