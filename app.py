@@ -1,3 +1,5 @@
+--- START OF FILE app.py ---
+
 import streamlit as st
 
 # ==========================================
@@ -662,15 +664,6 @@ with tab_config:
             f"</div>", 
             unsafe_allow_html=True
         )
-        
-        st.session_state.lateral_flow_b = st.number_input(
-            "馬鞍壩至石岡壩間日側流量 (側流B, 萬噸/日)",
-            min_value=0.0,
-            max_value=100.0,
-            value=st.session_state.lateral_flow_b,
-            step=0.5,
-            help="此側流在模擬中會優先折抵最下游石岡壩之總需求，減少馬鞍壩放水量。預設為 0.0 萬噸/日。"
-        )
 
         with st.expander("🍂 德基至馬鞍壩間側流係數設定 (側流A, 各月份可依需求調整)", expanded=False):
             st.caption("側流 A 推估公式：今日側流 A = 當日德基入流量 * 當月側流係數。請於下方微調各月份預設值：")
@@ -691,6 +684,15 @@ with tab_config:
                         value=st.session_state.monthly_lateral_coeffs[m],
                         step=0.1, key=f"lat_m_{m}"
                     )
+                    
+        st.session_state.lateral_flow_b = st.number_input(
+            "馬鞍壩至石岡壩間日側流量 (側流B, 萬噸/日)",
+            min_value=0.0,
+            max_value=100.0,
+            value=st.session_state.lateral_flow_b,
+            step=0.5,
+            help="此側流在模擬中會優先折抵最下游石岡壩之總需求，減少馬鞍壩放水量。預設為 0.0 萬噸/日。"
+        )
                     
     with col2:
         st.markdown("##### 📅 曆法與時序區間設定")
@@ -1468,6 +1470,10 @@ with tab_simulation:
                         "天然流量 (cms)": 0.0,
                         "原葫蘆墩需求 (cms)": 0.0,
                         "原下游五圳需求 (cms)": 0.0,
+                        "葫蘆墩圳供灌量 (萬噸)": 0.0,
+                        "下游五圳供灌量 (萬噸)": 0.0,
+                        "農業供灌總量 (萬噸)": 0.0,
+                        "公共用水量 (萬噸)": 0.0,
                         "今日側流A (萬噸)": 0.0,
                         "今日側流B (萬噸)": 0.0,
                         "今日下游總需求 (萬噸)": 0.0,
@@ -1493,7 +1499,7 @@ with tab_simulation:
                     lateral_b_vol = st.session_state.lateral_flow_b
                     
                     # 讀取下游需求
-                    out_row_candidates = df_daily_outflow[df_daily_outflow["開期" if "開期" in df_daily_outflow else "日期"] == current_date]
+                    out_row_candidates = df_daily_outflow[df_daily_outflow["開期" if "開期" in df_daily_outflow else "開期" if "開期" in df_daily_outflow else "日期"] == current_date]
                     if out_row_candidates.empty:
                         H_cms, F_cms, P_vol = 0.0, 0.0, 0.0
                     else:
@@ -1501,6 +1507,10 @@ with tab_simulation:
                         H_cms = out_row["葫蘆墩圳當日流量(cms)"]
                         F_cms = out_row["下游五圳當日流量(cms)"]
                         P_vol = out_row["公共供水當日水量(萬噸)"]
+                    
+                    H_vol = round(H_cms * 8.64, 2)
+                    F_vol = round(F_cms * 8.64, 2)
+                    ag_vol = round(H_vol + F_vol, 2)
                     
                     ag_demand_vol = round((H_cms + F_cms) * 8.64, 2)
                     downstream_total_demand_vol = round(ag_demand_vol + P_vol, 2)
@@ -1548,6 +1558,10 @@ with tab_simulation:
                         "天然流量 (cms)": I_cms,
                         "原葫蘆墩需求 (cms)": H_cms,
                         "原下游五圳需求 (cms)": F_cms,
+                        "葫蘆墩圳供灌量 (萬噸)": H_vol,
+                        "下游五圳供灌量 (萬噸)": F_vol,
+                        "農業供灌總量 (萬噸)": ag_vol,
+                        "公共用水量 (萬噸)": P_vol,
                         "今日側流A (萬噸)": lateral_a_vol,
                         "今日側流B (萬噸)": lateral_b_vol,
                         "今日下游總需求 (萬噸)": downstream_total_demand_vol,
@@ -1624,6 +1638,9 @@ with tab_simulation:
                 "今日實際放水量 (萬噸, 旬累計)",
                 "葫蘆墩圳需求 (cms, 旬均值)",
                 "下游五圳需求 (cms, 旬均值)",
+                "葫蘆墩圳供灌總量 (萬噸, 旬累計)",
+                "下游五圳供灌總量 (萬噸, 旬累計)",
+                "農業供灌總量 (萬噸, 旬累計)",
                 "公共用水總量 (萬噸, 旬累計)",
                 "供水缺口 (萬噸, 旬累計)"
             ]
@@ -1634,7 +1651,7 @@ with tab_simulation:
                 col_name = m_date.strftime("%m月%d日")
                 target_date = get_sim_target_date(m_date)
                 
-                match_day = df_sim_results[pd.to_datetime(df_sim_results["日期"]).dt.date == target_date]
+                match_day = df_sim_results[pd.to_datetime(df_sim_results["導航日期" if "導航日期" in df_sim_results else "日期"]).dt.date == target_date]
                 if not match_day.empty:
                     row_data_dict["期末庫容 (萬噸)"][col_name] = match_day.iloc[0]["本日末庫容 (萬噸)"]
                 else:
@@ -1663,8 +1680,10 @@ with tab_simulation:
                     row_data_dict["今日實際放水量 (萬噸, 旬累計)"][col_name] = df_p_days["今日實際放水量 (萬噸)"].sum()
                     row_data_dict["葫蘆墩圳需求 (cms, 旬均值)"][col_name] = df_p_days["原葫蘆墩需求 (cms)"].mean()
                     row_data_dict["下游五圳需求 (cms, 旬均值)"][col_name] = df_p_days["原下游五圳需求 (cms)"].mean()
-                    # 公共給水
-                    row_data_dict["公共用水總量 (萬噸, 旬累計)"][col_name] = (df_p_days["今日下游總需求 (萬噸)"].sum() - (df_p_days["原葫蘆墩需求 (cms)"].sum() + df_p_days["原下游五圳需求 (cms)"].sum()) * 8.64)
+                    row_data_dict["葫蘆墩圳供灌總量 (萬噸, 旬累計)"][col_name] = df_p_days["葫蘆墩圳供灌量 (萬噸)"].sum()
+                    row_data_dict["下游五圳供灌總量 (萬噸, 旬累計)"][col_name] = df_p_days["下游五圳供灌量 (萬噸)"].sum()
+                    row_data_dict["農業供灌總量 (萬噸, 旬累計)"][col_name] = df_p_days["農業供灌總量 (萬噸)"].sum()
+                    row_data_dict["公共用水總量 (萬噸, 旬累計)"][col_name] = df_p_days["公共用水量 (萬噸)"].sum()
                     row_data_dict["供水缺口 (萬噸, 旬累計)"][col_name] = df_p_days["供水缺口 (萬噸)"].sum()
                 else:
                     for lbl in row_labels[1:]:
@@ -1708,7 +1727,10 @@ with tab_simulation:
                 今日實際放水量_萬噸=("今日實際放水量 (萬噸)", "sum"),
                 葫蘆墩需求_cms=("原葫蘆墩需求 (cms)", "mean"),
                 下游五圳需求_cms=("原下游五圳需求 (cms)", "mean"),
-                公共用水總量_萬噸=("今日下游總需求 (萬噸)", lambda x: round(x.sum(), 2)),
+                葫蘆墩供灌總量_萬噸=("葫蘆墩圳供灌量 (萬噸)", "sum"),
+                下游五圳供灌總量_萬噸=("下游五圳供灌量 (萬噸)", "sum"),
+                農業供灌總量_萬噸=("農業供灌總量 (萬噸)", "sum"),
+                公共用水總量_萬噸=("公共用水量 (萬噸)", "sum"),
                 供水缺口_萬噸=("供水缺口 (萬噸)", "sum"),
                 期末庫容_萬噸=("本日末庫容 (萬噸)", "last"),
                 累計庫容淨變化_萬噸=("當日庫容淨變化 (萬噸)", "sum")
@@ -1722,6 +1744,9 @@ with tab_simulation:
                 "今日實際放水量 (萬噸, 旬累計)",
                 "葫蘆墩需求 (cms, 旬均值)",
                 "下游五圳需求 (cms, 旬均值)",
+                "葫蘆墩圳供灌總量 (萬噸)",
+                "下游五圳供灌總量 (萬噸)",
+                "農業供灌總量 (萬噸)",
                 "公共用水總量 (萬噸, 旬累計)",
                 "供水缺口 (萬噸, 旬累計)",
                 "期末庫容 (萬噸)",
@@ -1737,6 +1762,9 @@ with tab_simulation:
                 "今日實際放水量 (萬噸, 旬累計)",
                 "葫蘆墩需求 (cms, 旬均值)",
                 "下游五圳需求 (cms, 旬均值)",
+                "葫蘆墩圳供灌總量 (萬噸)",
+                "下游五圳供灌總量 (萬噸)",
+                "農業供灌總量 (萬噸)",
                 "公共用水總量 (萬噸, 旬累計)",
                 "供水缺口 (萬噸, 旬累計)",
                 "累計庫容淨變化 (萬噸)"
@@ -1995,3 +2023,5 @@ with tab_products:
             st.plotly_chart(fig_multi, use_container_width=True)
     else:
         st.info("💡 目前暫存庫中尚無儲存情境。請先至『第四階段：庫容推估演算』點擊「▶️ 開始進行發電聯調推估」，並於本頁籤最上方輸入情境名稱（如：常態Q50）點擊「💾 暫存此情境」即可生成本頁比對產品。")
+
+--- END OF FILE app.py ---
