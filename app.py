@@ -457,7 +457,7 @@ def plot_reservoir_capacity_trend(df_sim_results: pd.DataFrame, display_start: d
     df_plot["日期"] = pd.to_datetime(df_plot["日期"]).dt.date
     
     # 實際庫容 (黑色實線)
-    df_history = df_plot[df_plot["日期"] <= boundary_day]
+    df_history = df_plot[df_plot["開期" if "開期" in df_plot else "日期"] <= boundary_day]
     if not df_history.empty:
         fig.add_trace(go.Scatter(
             x=df_history["日期"],
@@ -616,6 +616,10 @@ if "mixed_demand_configs" not in st.session_state:
     st.session_state.mixed_demand_configs = {}
 if "override_list" not in st.session_state:
     st.session_state.override_list = []
+
+# 【新增狀態】逐旬自訂強制滿載發電狀態記錄器
+if "period_force_full_load" not in st.session_state:
+    st.session_state.period_force_full_load = {}
 
 # 多情境暫存器
 if "scenarios" not in st.session_state:
@@ -993,7 +997,7 @@ with tab_inflow:
         """)
 
 # -----------------
-# TAB 3: 第三階段出流需求
+# TAB 3: 第三階段出流需求與自訂滿載發電
 # -----------------
 with tab_outflow:
     st.subheader("🚰 出流標的與大甲溪下游需求設定")
@@ -1012,6 +1016,37 @@ with tab_outflow:
         outflow_index = outflow_options.index(st.session_state.outflow_source)
         outflow_mode = st.radio("請選擇大甲溪常態下游出流配置模式：", outflow_options, index=outflow_index, horizontal=True)
         st.session_state.outflow_source = outflow_mode
+        
+        # ==========================================
+        # 【新增功能】：逐旬自訂是否強制滿載發電 (16.55 cms) 控制面版
+        # ==========================================
+        st.markdown("---")
+        st.markdown("##### ⚡ 逐旬自訂強制滿載發電 (16.55 cms) 設定")
+        st.caption("您可以針對未來推估期間的各個旬別，獨立勾選是否在該期間進行「**強制滿載發電**」。若勾選，系統後台演算時將無視下游其餘標的需求與側流量折抵，直接強制該旬內每日德基放水量鎖定為 16.55 cms（折合日水量約 142.99 萬噸）；未勾選之旬別，則會依照下方設定之常態下游需求與側流進行發電聯調。")
+        
+        if proj_unique_periods.empty:
+            st.warning("⚠️ 請先至第一階段設定正確的推估時間區間。")
+        else:
+            cols_per_row = 4
+            for i in range(0, len(proj_unique_periods), cols_per_row):
+                chunk = proj_unique_periods.iloc[i : i + cols_per_row]
+                cols = st.columns(len(chunk))
+                for idx, (_, p_row) in enumerate(chunk.iterrows()):
+                    y, m, p = p_row["年份"], p_row["月份"], p_row["旬別"]
+                    period_key = f"{y}-{m}-{p}"
+                    
+                    if period_key not in st.session_state.period_force_full_load:
+                        st.session_state.period_force_full_load[period_key] = False
+                        
+                    with cols[idx]:
+                        is_checked = st.checkbox(
+                            f"🔌 {y}年{m}月{p} 滿載",
+                            value=st.session_state.period_force_full_load[period_key],
+                            key=f"full_load_chk_{period_key}",
+                            help="勾選後，此旬別每日均強制德基放水 16.55 cms。"
+                        )
+                        st.session_state.period_force_full_load[period_key] = is_checked
+        st.markdown("---")
         
         base_demand_list = []
         if outflow_mode == "使用前一年度資料":
@@ -1497,7 +1532,7 @@ with tab_simulation:
                     lateral_b_vol = st.session_state.lateral_flow_b
                     
                     # 讀取下游需求
-                    out_row_candidates = df_daily_outflow[df_daily_outflow["開期" if "開期" in df_daily_outflow else "日期"] == current_date]
+                    out_row_candidates = df_daily_outflow[df_daily_outflow["日期"] == current_date]
                     if out_row_candidates.empty:
                         H_cms, F_cms, P_vol = 0.0, 0.0, 0.0
                     else:
@@ -1516,8 +1551,17 @@ with tab_simulation:
                     # 馬鞍堰至石岡壩調度控制律
                     ma_an_discharge_demand_vol = max(0.0, downstream_total_demand_vol - lateral_b_vol)
                     
-                    # 德基至馬鞍堰串聯與側流控制律
-                    techi_min_discharge_demand_vol = max(0.0, ma_an_discharge_demand_vol - lateral_a_vol)
+                    # ==========================================
+                    # 【核心演算異動】：判斷「當前旬別」是否勾選為強制滿載發電
+                    # ==========================================
+                    is_period_full_load = st.session_state.period_force_full_load.get(key, False)
+                    
+                    if is_period_full_load:
+                        # 滿載發電需求直接鎖定為 16.55 cms (折合日水量 16.55 * 8.64)
+                        techi_min_discharge_demand_vol = round(16.55 * 8.64, 2)
+                    else:
+                        # 依照常態德基至馬鞍堰串聯與側流控制律計算
+                        techi_min_discharge_demand_vol = max(0.0, ma_an_discharge_demand_vol - lateral_a_vol)
                     
                     yesterday_capacity = curr_capacity
                     calculated_capacity = yesterday_capacity + I_vol - techi_min_discharge_demand_vol
@@ -1528,7 +1572,7 @@ with tab_simulation:
                         techi_actual_discharge_vol = techi_min_discharge_demand_vol + (calculated_capacity - max_capacity)
                         curr_capacity = max_capacity
                         deficit_vol = 0.0
-                    # 情境乙：今日暫定庫容 < 0
+                    # 情境乙：今日暫定庫容 < 0 (空庫物理限制)
                     elif calculated_capacity < 0:
                         techi_actual_discharge_vol = max(0.0, yesterday_capacity + I_vol)
                         curr_capacity = 0.0
@@ -1552,7 +1596,7 @@ with tab_simulation:
                         "年份": row["年份"],
                         "月份": row["月份"],
                         "旬別": row["旬別"],
-                        "運行狀態": "🔮 未來推估",
+                        "運行狀態": "🔮 未來推估 (滿載)" if is_period_full_load else "🔮 未來推估",
                         "天然流量 (cms)": I_cms,
                         "原葫蘆墩需求 (cms)": H_cms,
                         "原下游五圳需求 (cms)": F_cms,
@@ -1598,7 +1642,7 @@ with tab_simulation:
             with m3:
                 st.metric("供水缺口總水量", f"{round(total_water_deficit_10k, 1)} 萬噸")
             with m4:
-                dry_days = sum(1 for _, item in df_sim_results.iterrows() if item["本日末庫容 (萬噸)"] <= 0.0 and item["運行狀態"] == "🔮 未來推估")
+                dry_days = sum(1 for _, item in df_sim_results.iterrows() if item["本日末庫容 (萬噸)"] <= 0.0 and "🔮 未來推估" in item["運行狀態"])
                 st.metric("庫容枯竭空庫天數", f"{dry_days} 天", delta="🚨 警告：空庫枯竭！" if dry_days > 0 else "🟢 安全")
 
             # 2. Plotly 歷線趨勢圖
@@ -1813,7 +1857,7 @@ with tab_products:
         col_scen_name, col_scen_btn = st.columns([3, 1])
         with col_scen_name:
             new_scen_name = st.text_input(
-                "請輸入此情境名稱 (例：氣候區間上限 / Q80 / Q90)：", 
+                "請輸入此情境名稱 (例：氣候區間上限 / Q80 / Q90 / 滿載試算方案)：", 
                 value="情境A", 
                 key="new_scen_name_input"
             )
@@ -1932,7 +1976,7 @@ with tab_products:
             # 2. 推估歷線
             for name in selected_scenarios:
                 df_scen = st.session_state.scenarios[name]
-                col_scen = "日期"
+                col_scen = "開期" if "開期" in df_scen else "日期"
                 df_proj = df_scen[pd.to_datetime(df_scen[col_scen]).dt.date >= boundary_day]
                 if not df_proj.empty:
                     fig_multi.add_trace(go.Scatter(
